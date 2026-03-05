@@ -1,0 +1,93 @@
+[BUG] [alpha] RenameWidget applies rename edits twice for current file
+
+Summary: Rename applies workspace edits via backend for all files and then applies current file edits again with model.pushEditOperations.
+
+Source references:
+- cortex-ide/src/components/editor/RenameWidget.tsx:509
+- cortex-ide/src/components/editor/RenameWidget.tsx:532
+- cortex-ide/src/components/editor/RenameWidget.tsx:551
+- cortex-ide/src/components/editor/RenameWidget.tsx:563
+
+Deterministic proof:
+Control flow in handleSubmit:
+1) For every file in workspaceEdit.changes, invoke('apply_workspace_edit', ...).
+2) Then, if current editor model URI exists in workspaceEdit.changes,
+   call model.pushEditOperations(...) with the same edits.
+
+When current file is part of workspaceEdit.changes, the same logical rename edits
+are applied once via backend path and once via model path.
+
+Expected:
+Each text edit should be applied exactly once per affected file.
+
+Actual:
+Current file receives both backend and model edit application paths.
+
+Snippet:
+ 509:       for (const [fileUri, textEdits] of Object.entries(workspaceEdit.changes)) {
+ 510:         // Store original text for undo
+ 511:         const originalEdits: TextEdit[] = [];
+ 512:         
+ 513:         // Apply edits using backend
+ 514:         for (const edit of textEdits) {
+ 515:           locations.push({
+ 516:             uri: fileUri,
+ 517:             range: lspRangeToEditorRange(edit.range),
+ 518:             newText: currentState.newName,
+ 519:           });
+ 520:           
+ 521:           // Store reverse edit for undo
+ 522:           originalEdits.push({
+ 523:             range: edit.range,
+ 524:             newText: currentState.oldName,
+ 525:           });
+ 526:         }
+ 527:         
+ 528:         undoEdits.push({ uri: fileUri, edits: originalEdits });
+ 529:         
+ 530:         // Apply edits via backend
+ 531:         try {
+ 532:           await invoke("apply_workspace_edit", {
+ 533:             uri: fileUri,
+ 534:             edits: textEdits.map(e => ({
+ 535:               range: {
+ 536:                 start: { line: e.range.start.line, character: e.range.start.character },
+ 537:                 end: { line: e.range.end.line, character: e.range.end.character },
+ 538:               },
+ 539:               new_text: e.newText,
+ 540:             })),
+ 541:           });
+ 542:         } catch (applyError) {
+ 543:           editorLogger.error(`Failed to apply edits to ${fileUri}:`, applyError);
+ 544:         }
+ 545:       }
+ 546:       
+ 547:       // Also update current editor model if it's one of the affected files
+ 548:       const model = editor.getModel();
+ 549:       if (model) {
+ 550:         const currentUri = model.uri.toString();
+ 551:         const currentFileEdits = workspaceEdit.changes[currentUri];
+ 552:         
+ 553:         if (currentFileEdits) {
+ 554:           // Sort edits in reverse order to apply from bottom to top
+ 555:           const sortedEdits = [...currentFileEdits].sort((a, b) => {
+ 556:             if (a.range.start.line !== b.range.start.line) {
+ 557:               return b.range.start.line - a.range.start.line;
+ 558:             }
+ 559:             return b.range.start.character - a.range.start.character;
+ 560:           });
+ 561:           
+ 562:           // Apply edits using Monaco's pushEditOperations for undo support
+ 563:           model.pushEditOperations(
+ 564:             [],
+ 565:             sortedEdits.map(edit => ({
+ 566:               range: new monaco.Range(
+ 567:                 edit.range.start.line + 1,
+ 568:                 edit.range.start.character + 1,
+ 569:                 edit.range.end.line + 1,
+ 570:                 edit.range.end.character + 1
+ 571:               ),
+ 572:               text: edit.newText,
+ 573:             })),
+ 574:             () => null
+ 575:           );

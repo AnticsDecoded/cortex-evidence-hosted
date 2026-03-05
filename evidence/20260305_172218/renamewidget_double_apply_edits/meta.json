@@ -1,0 +1,18 @@
+{
+  "slug": "renamewidget_double_apply_edits",
+  "title": "[BUG] [alpha] RenameWidget applies rename edits twice for current file",
+  "summary": "Rename applies workspace edits via backend for all files and then applies current file edits again with model.pushEditOperations.",
+  "refs": [
+    "cortex-ide/src/components/editor/RenameWidget.tsx:509",
+    "cortex-ide/src/components/editor/RenameWidget.tsx:532",
+    "cortex-ide/src/components/editor/RenameWidget.tsx:551",
+    "cortex-ide/src/components/editor/RenameWidget.tsx:563"
+  ],
+  "steps": [
+    "Run rename where current editor file is included in workspaceEdit.changes.",
+    "Observe backend apply executes for current URI in loop.",
+    "Observe current model path applies same edits again afterward."
+  ],
+  "expected": "Each text edit should be applied exactly once per affected file.",
+  "actual": "Current file receives both backend and model edit application paths."
+}
