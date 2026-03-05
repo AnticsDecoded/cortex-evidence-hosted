@@ -1,0 +1,17 @@
+{
+  "slug": "monacomanager_acquireeditor_lru_unreachable",
+  "title": "[BUG] [alpha] monacoManager acquireEditor LRU branch is unreachable",
+  "summary": "The pool-full LRU reuse block filters !inUse after a prior !inUse search has already failed, making that branch unreachable.",
+  "refs": [
+    "cortex-ide/src/utils/monacoManager.ts:720",
+    "cortex-ide/src/utils/monacoManager.ts:766",
+    "cortex-ide/src/utils/monacoManager.ts:767"
+  ],
+  "steps": [
+    "Enter acquireEditor when pool is full.",
+    "Fail first available = find(!inUse) lookup.",
+    "Observe later LRU branch again requires !inUse via filter(!inUse)."
+  ],
+  "expected": "LRU branch should select a reusable editor when pool is full.",
+  "actual": "LRU candidate is always empty under current path conditions."
+}

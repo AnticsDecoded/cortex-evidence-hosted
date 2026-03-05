@@ -1,0 +1,88 @@
+[BUG] [alpha] monacoManager acquireEditor LRU branch is unreachable
+
+Summary: The pool-full LRU reuse block filters !inUse after a prior !inUse search has already failed, making that branch unreachable.
+
+Source references:
+- cortex-ide/src/utils/monacoManager.ts:720
+- cortex-ide/src/utils/monacoManager.ts:766
+- cortex-ide/src/utils/monacoManager.ts:767
+
+Deterministic proof:
+Path condition to reach LRU branch:
+1) available = find(!inUse) is falsy  -> all pool entries are inUse
+2) pool is full                         -> enters branch starting at line 766
+3) leastUsed = filter(!inUse)[0]        -> empty by condition (1)
+4) leastUsed is always undefined        -> branch never executes
+
+Conclusion: 'reuse least recently used editor' block is unreachable dead code.
+
+Expected:
+LRU branch should select a reusable editor when pool is full.
+
+Actual:
+LRU candidate is always empty under current path conditions.
+
+Snippet:
+ 719:     // Look for an available editor in the pool
+ 720:     const available = this.editorPool.find((p) => !p.inUse);
+ 721:     
+ 722:     if (available) {
+ 723:       available.inUse = true;
+ 724:       available.lastUsed = Date.now();
+ 725:       
+ 726:       // Move editor to new container
+ 727:       if (available.container !== container) {
+ 728:         // Layout editor in new container
+ 729:         container.appendChild(available.container);
+ 730:         available.editor.layout();
+ 731:       }
+ 732:       
+ 733:       // Update options
+ 734:       available.editor.updateOptions(options);
+ 735:       
+ 736:       return available.editor;
+ 737:     }
+ 738: 
+ 739:     // Create new editor if pool not full
+ 740:     if (this.editorPool.length < this.config.poolSize) {
+ 741:       // Create a wrapper div for the editor
+ 742:       const editorContainer = document.createElement("div");
+ 743:       editorContainer.style.width = "100%";
+ 744:       editorContainer.style.height = "100%";
+ 745:       container.appendChild(editorContainer);
+ 746: 
+ 747:       const editor = this.monaco.editor.create(editorContainer, {
+ 748:         ...options,
+ 749:         theme: "cortex-dark",
+ 750:         automaticLayout: true,
+ 751:       });
+ 752: 
+ 753:       const pooled: PooledEditor = {
+ 754:         editor,
+ 755:         inUse: true,
+ 756:         container: editorContainer,
+ 757:         filePath: null,
+ 758:         lastUsed: Date.now(),
+ 759:       };
+ 760: 
+ 761:       this.editorPool.push(pooled);
+ 762:       return editor;
+ 763:     }
+ 764: 
+ 765:     // Pool is full, reuse the least recently used editor
+ 766:     const leastUsed = this.editorPool
+ 767:       .filter((p) => !p.inUse)
+ 768:       .sort((a, b) => a.lastUsed - b.lastUsed)[0];
+ 769: 
+ 770:     if (leastUsed) {
+ 771:       leastUsed.inUse = true;
+ 772:       leastUsed.lastUsed = Date.now();
+ 773:       
+ 774:       container.appendChild(leastUsed.container);
+ 775:       leastUsed.editor.updateOptions(options);
+ 776:       leastUsed.editor.layout();
+ 777:       
+ 778:       return leastUsed.editor;
+ 779:     }
+ 780: 
+ 781:     // All editors in use - create a temporary one (will be cleaned up later)
