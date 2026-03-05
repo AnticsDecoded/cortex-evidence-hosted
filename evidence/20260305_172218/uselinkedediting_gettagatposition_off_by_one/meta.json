@@ -1,0 +1,17 @@
+{
+  "slug": "uselinkedediting_gettagatposition_off_by_one",
+  "title": "[BUG] [alpha] useLinkedEditing getTagAtPosition has end-column off-by-one",
+  "summary": "Tag end column is computed as start + length, which includes one character past the tag name; hit test includes closing bracket column.",
+  "refs": [
+    "cortex-ide/src/components/editor/features/useLinkedEditing.ts:48",
+    "cortex-ide/src/components/editor/features/useLinkedEditing.ts:50",
+    "cortex-ide/src/components/editor/features/useLinkedEditing.ts:60"
+  ],
+  "steps": [
+    "Call getTagAtPosition on '<div>' with cursor at column 5 (on '>').",
+    "Check computed tag range boundaries.",
+    "Observe function treats '>' column as inside tag name range."
+  ],
+  "expected": "Tag name 'div' should occupy columns 2..4 only.",
+  "actual": "Computed end column includes column 5, causing false-positive tag hit."
+}

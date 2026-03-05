@@ -1,0 +1,46 @@
+[BUG] [alpha] useLinkedEditing getTagAtPosition has end-column off-by-one
+
+Summary: Tag end column is computed as start + length, which includes one character past the tag name; hit test includes closing bracket column.
+
+Source references:
+- cortex-ide/src/components/editor/features/useLinkedEditing.ts:48
+- cortex-ide/src/components/editor/features/useLinkedEditing.ts:50
+- cortex-ide/src/components/editor/features/useLinkedEditing.ts:60
+
+Deterministic proof:
+Input line: '<div>'
+Computed tagNameStart=2, tagNameEnd=5
+Actual tag name columns should be 2..4 for 'div'.
+Current check uses column <= tagNameEnd, so column 5 ('>') is included in tag hit range.
+This is an off-by-one end-column inclusion.
+
+Expected:
+Tag name 'div' should occupy columns 2..4 only.
+
+Actual:
+Computed end column includes column 5, causing false-positive tag hit.
+
+Snippet:
+  39: function getTagAtPosition(lineContent: string, column: number): TagInfo | null {
+  40:   const tagPattern = /<\/?([a-zA-Z][a-zA-Z0-9.-]*)/g;
+  41:   let match: RegExpExecArray | null;
+  42: 
+  43:   while ((match = tagPattern.exec(lineContent)) !== null) {
+  44:     const fullMatch = match[0];
+  45:     const tagName = match[1];
+  46:     const isClosingTag = fullMatch.startsWith("</");
+  47:     const tagNameStart = match.index + (isClosingTag ? 2 : 1) + 1;
+  48:     const tagNameEnd = tagNameStart + tagName.length;
+  49: 
+  50:     if (column >= tagNameStart && column <= tagNameEnd) {
+  51:       const restOfLine = lineContent.substring(match.index);
+  52:       const selfClosingPattern = new RegExp(`<${tagName}[^>]*/>`);
+  53:       const isSelfClosing = !isClosingTag && selfClosingPattern.test(restOfLine);
+  54: 
+  55:       return {
+  56:         tagName,
+  57:         isClosingTag,
+  58:         isSelfClosing,
+  59:         startColumn: tagNameStart,
+  60:         endColumn: tagNameEnd,
+  61:       };
