@@ -1,0 +1,17 @@
+{
+  "slug": "mergeeditor_codelens_conflict_match_by_label",
+  "title": "[BUG] [alpha] MergeEditor CodeLens conflict matching by label misplaces actions",
+  "summary": "CodeLens locates conflict line by oursLabel text only; repeated labels (for example multiple HEAD conflicts) map to first match and misplace actions.",
+  "refs": [
+    "cortex-ide/src/components/git/MergeEditor.tsx:770",
+    "cortex-ide/src/components/git/MergeEditor.tsx:774",
+    "cortex-ide/src/components/git/MergeEditor.tsx:775"
+  ],
+  "steps": [
+    "Open merge content with at least two unresolved conflicts sharing same oursLabel.",
+    "Generate CodeLens entries.",
+    "Observe second conflict actions anchor to first matching label line."
+  ],
+  "expected": "Each conflict should map CodeLens by conflict identity or exact marker position.",
+  "actual": "Label-only matching maps duplicate labels to the first marker line."
+}
