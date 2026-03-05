@@ -1,0 +1,56 @@
+[BUG] [alpha] multiCursor getSelectionLength double-counts newlines
+
+Summary: Multi-line selection length overcounts newline characters because middle-line newlines and cross-line newlines are both added.
+
+Source references:
+- cortex-ide/src/utils/multiCursor.ts:1327
+- cortex-ide/src/utils/multiCursor.ts:1350
+- cortex-ide/src/utils/multiCursor.ts:1357
+
+Deterministic proof:
+Input lines: ['abcdef', 'gh', 'ij']
+Selection: (1,2) -> (3,2)
+Expected length (index diff): 10
+Actual length (current code): 11
+Delta: +1 (extra newline counted)
+
+Expected:
+Selection length should equal endIndex - startIndex in flattened text.
+
+Actual:
+Function returns one extra character due to duplicate newline accounting.
+
+Snippet:
+1327: export function getSelectionLength(selection: Selection, lines: string[]): number {
+1328:   if (isSelectionEmpty(selection)) {
+1329:     return 0;
+1330:   }
+1331: 
+1332:   const normalized = normalizeSelection(selection);
+1333: 
+1334:   if (normalized.startLineNumber === normalized.endLineNumber) {
+1335:     return normalized.endColumn - normalized.startColumn;
+1336:   }
+1337: 
+1338:   let length = 0;
+1339: 
+1340:   // First line (from start column to end)
+1341:   const firstLine = lines[normalized.startLineNumber - 1] || '';
+1342:   length += firstLine.length - normalized.startColumn + 1;
+1343: 
+1344:   // Middle lines (full lines + newline)
+1345:   for (
+1346:     let i = normalized.startLineNumber;
+1347:     i < normalized.endLineNumber - 1;
+1348:     i++
+1349:   ) {
+1350:     length += (lines[i]?.length || 0) + 1; // +1 for newline
+1351:   }
+1352: 
+1353:   // Last line (from start to end column)
+1354:   length += normalized.endColumn - 1;
+1355: 
+1356:   // Add newlines between lines
+1357:   length += normalized.endLineNumber - normalized.startLineNumber;
+1358: 
+1359:   return length;

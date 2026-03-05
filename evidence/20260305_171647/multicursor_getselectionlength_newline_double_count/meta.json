@@ -1,0 +1,17 @@
+{
+  "slug": "multicursor_getselectionlength_newline_double_count",
+  "title": "[BUG] [alpha] multiCursor getSelectionLength double-counts newlines",
+  "summary": "Multi-line selection length overcounts newline characters because middle-line newlines and cross-line newlines are both added.",
+  "refs": [
+    "cortex-ide/src/utils/multiCursor.ts:1327",
+    "cortex-ide/src/utils/multiCursor.ts:1350",
+    "cortex-ide/src/utils/multiCursor.ts:1357"
+  ],
+  "steps": [
+    "Create a 3-line selection where line 2 is a middle line.",
+    "Call getSelectionLength(selection, lines).",
+    "Compare with index-diff length from flattened text."
+  ],
+  "expected": "Selection length should equal endIndex - startIndex in flattened text.",
+  "actual": "Function returns one extra character due to duplicate newline accounting."
+}
